@@ -4,8 +4,12 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.media.Image
 import android.net.Uri
+import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.MediaStore
@@ -16,6 +20,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.get
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.lang.Exception
 import java.util.jar.Manifest
 
 class MainActivity : AppCompatActivity() {
@@ -38,6 +46,37 @@ class MainActivity : AppCompatActivity() {
 
     companion object{
         private const val STORAGE_PERMISSION_CODE = 1
+    }
+
+    private inner class BitmapAsyncTask(val mBitmap: Bitmap?): AsyncTask<Any, Void, String>(){
+        override fun doInBackground(vararg params: Any?): String {
+            var result = ""
+            if(mBitmap != null){
+                try{
+                    val bytes = ByteArrayOutputStream()
+                    mBitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
+                    val f = File(externalCacheDir!!.absoluteFile.toString()
+                            +File.separator+"DrawingApp_"+System.currentTimeMillis()/1000+".png")
+                    val fO = FileOutputStream(f)
+                    fO.write(bytes.toByteArray())
+                    fO.close()
+                    result = f.absolutePath
+                }catch (e: Exception){
+                    result = ""
+                    e.printStackTrace()
+                }
+            }
+            return result
+        }
+
+        override fun onPostExecute(result: String?) {
+            super.onPostExecute(result)
+            if(result!!.isNotEmpty()){
+                Toast.makeText(this@MainActivity, "File Saved Successfully", Toast.LENGTH_SHORT).show()
+            }else{
+                Toast.makeText(this@MainActivity, "Something went wrong, try again", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun requestStoragePermission(){
@@ -106,6 +145,30 @@ class MainActivity : AppCompatActivity() {
         undoBtn.setOnClickListener {
             drawingView.onClickUndo()
         }
+
+        val saveBtn = findViewById<ImageButton>(R.id.ib_save)
+        saveBtn.setOnClickListener {
+            if(isReadStorageAllowed()){
+                val flView = findViewById<FrameLayout>(R.id.fl_drawing)
+                BitmapAsyncTask(getBitmapFromView(flView)).execute()
+            }else{
+                requestStoragePermission()
+            }
+        }
+    }
+
+    private fun getBitmapFromView(view: View) : Bitmap {
+        val returnedBitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(returnedBitmap)
+        val bgDrawable = view.background
+        if(bgDrawable != null){
+            bgDrawable.draw(canvas)
+        }else{
+            canvas.drawColor(Color.WHITE)
+        }
+
+        view.draw(canvas)
+        return returnedBitmap
     }
 
     private fun showBrushSizeChooserDialog(){
