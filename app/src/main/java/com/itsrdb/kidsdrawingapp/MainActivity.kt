@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.media.Image
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
@@ -49,6 +50,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class BitmapAsyncTask(val mBitmap: Bitmap?): AsyncTask<Any, Void, String>(){
+
+        private lateinit var mProgressDialog: Dialog
+
+        override fun onPreExecute() {
+            super.onPreExecute()
+            showProgressDialog()
+        }
+
         override fun doInBackground(vararg params: Any?): String {
             var result = ""
             if(mBitmap != null){
@@ -71,12 +80,42 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
+            cancelProgressDialog()
             if(result!!.isNotEmpty()){
                 Toast.makeText(this@MainActivity, "File Saved Successfully", Toast.LENGTH_SHORT).show()
             }else{
                 Toast.makeText(this@MainActivity, "Something went wrong, try again", Toast.LENGTH_SHORT).show()
             }
+
+            MediaScannerConnection.scanFile(
+                this@MainActivity, arrayOf(result), null) { path, uri ->
+                val shareIntent = Intent()
+                shareIntent.action = Intent.ACTION_SEND
+                shareIntent.putExtra(
+                    Intent.EXTRA_STREAM,
+                    uri
+                )
+                shareIntent.type =
+                    "image/jpeg"
+                startActivity(
+                    Intent.createChooser(
+                        shareIntent,
+                        "Share"
+                    )
+                )
+            }
         }
+
+        private fun showProgressDialog(){
+            mProgressDialog = Dialog(this@MainActivity)
+            mProgressDialog.setContentView(R.layout.dialog_custom_progress)
+            mProgressDialog.show()
+        }
+
+        private fun cancelProgressDialog(){
+            mProgressDialog.dismiss()
+        }
+
     }
 
     private fun requestStoragePermission(){
